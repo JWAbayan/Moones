@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Metropolis";
+  src: url('./assets/fonts/Metropolis-Regular.otf');
+}
+
+@theme{
+  --font-display: "Metropolis";
+  --color-yellow: #ffc20c;
+}

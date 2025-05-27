@@ -60,12 +60,12 @@ export default function Player(){
      * @autoplay : boolean : tells the playback to continue loading and playing audio from tracks array
      * 
     */
-     const [playbackStates, setPlaybackStates] = useState({
+    const [playbackStates, setPlaybackStates] = useState({
            paused: true,
            volume: 1,
+           pos: 0,
            autoplay: true,
-           pos: 0
-     })
+    })
 
     /**
      * 
@@ -92,14 +92,6 @@ export default function Player(){
             fetchTracks(searchParams[0].get("mood"))
         }
 
-        // const instance = new Howl({
-        //     src:[SampleTrack],
-        //     onload:()=>{
-        //         setPlayingTrack({...playingTrack, audio: instance, duration:instance.duration()});
-        //     }
-        // })
-
-
         return ()=>{
             clearInterval(updatePlaybackPosInterval.current);
         }
@@ -109,24 +101,27 @@ export default function Player(){
     useEffect(()=> {
         if(!playingTrack.audio) return
 
-        playingTrack.audio.play();
+        playingTrack.audio.once("end", () => {
+            if(playbackStates.autoplay)
+                changeTrack(1);
+            else
+                setPlaybackStates({...playbackStates, paused: true})
+        })
         
-        setPlaybackStates({...playbackStates, paused: false})
+        playingTrack.audio.play();
+        updatePlaybackPosOnInterval(playingTrack.audio);
 
+        setPlaybackStates({...playbackStates, paused: false})
+        
         return(()=>{
             playingTrack.audio.unload();
         })
     },[playingTrack])
 
-    //Effect when playbackStates changes
+    //Effect when playbackStates.paused changed
     useEffect(()=>{
         if(!playingTrack.audio) return;
-
-        console.log("Pause State Changed");
-        console.log(playbackStates.paused)
         
-        if(updatePlaybackPosInterval.current) clearInterval(updatePlaybackPosInterval.current)
-
         if(playbackStates.paused){
             playingTrack.audio.pause();
         }else{
@@ -176,6 +171,7 @@ export default function Player(){
                     img: trackImgURL,
                     title: trackTitle,
                     artist: trackArtist,
+                    duration: howlInstance.duration(),
                 })
             },
             onloaderror: (id ,error) => {
@@ -190,10 +186,11 @@ export default function Player(){
     }
 
     function updatePlaybackPosOnInterval(audio){
-        if(!audio){
-            console.log("Audio Empty");                
+        if(!audio){              
             return;
         } 
+
+        if(updatePlaybackPosInterval.current) clearInterval(updatePlaybackPosInterval.current)
 
         updatePlaybackPosInterval.current = setInterval(()=>{
             setPlaybackStates(playbackStates => ({...playbackStates, pos: audio.seek()}))
@@ -203,31 +200,29 @@ export default function Player(){
     function handlePlaybackChange(event){
         if(!playingTrack.audio) return;
 
-        if(updatePlaybackPosInterval.current){
-            clearInterval(updatePlaybackPosInterval.current);
-        } 
+        playingTrack.audio.seek(event.target.value);
+        updatePlaybackPosOnInterval(playingTrack.audio);
 
-        updatePlaybackPosOnInterval(playingTrack.audio)
-        playingTrack.audio.seek(event.target.value)
-        setPlaybackStates(playbackStates => ({...playbackStates, pos: event.target.value}))
+        //When paused, automatically play the track when 
+        // user manually changed the playback position
+        setPlaybackStates(playbackStates.paused ? 
+            {...playbackStates, paused: false, pos:event.target.value}:
+            {...playbackStates, pos:event.target.value}
+        )
 
-        // if(playbackStates.paused) {
-        //     playingTrack.audio.play();
-        //     setPlaybackStates(playbackStates=>({...playbackStates, paused: false}));
-        // }
-            
-
-        
-       
     }
 
-    function handlePause(){
-        setPlaybackStates(playbackStates => ({...playbackStates, paused: !playbackStates.paused}))
+    function handlePause(pause){
+        setPlaybackStates({...playbackStates, paused: !pause})
     }
 
-    function changeTrack(step){
+    function changeTrack(step, tracks){
+        if(playerStates.tracks.length == 0) {
+            console.log("Tracks Array Empty") 
+            return;
+        }
+
         const nextTrackIndex = playerStates.playingIndex + step;
-
         const trackIndexInBounds = nextTrackIndex >= 0 && nextTrackIndex < playerStates.tracks.length; 
 
         if(trackIndexInBounds){
@@ -237,7 +232,6 @@ export default function Player(){
                 playingIndex: nextTrackIndex,
             }))
         }
-            
         else
             console.log("Next Track Index is out of bounds")
     }
@@ -251,7 +245,14 @@ export default function Player(){
                 <h2 className=" text-sm text-gray-500 mt-1">{playingTrack.artist}</h2>
             </div>
             <div className="flex flex-col items-center mt-20 w-full">
-                <input className=" shadow accent-yellow w-[80%] " ref={playbackPosUI} type="range" value={playbackStates.pos} min={0} max={playingTrack.duration} onChange={handlePlaybackChange} disabled={!playingTrack}/>
+                <input className=" shadow accent-yellow w-[80%] " 
+                    ref={playbackPosUI} 
+                    type="range" 
+                    value={playbackStates.pos} 
+                    min={0} 
+                    max={playingTrack.duration} 
+                    onChange={handlePlaybackChange} disabled={!playingTrack}
+                />
                 <div className="flex w-full justify-evenly">
                     <PlaybackControlButton 
                         icon={<ChevronLeftIcon/>} 
@@ -260,7 +261,7 @@ export default function Player(){
                     />
                     <PlaybackControlButton 
                         icon={playbackStates.paused ? <PlayIcon/>: <PauseIcon/>} 
-                        onClick={()=> handlePause()} 
+                        onClick={() => handlePause(playbackStates.paused)}
                         disabled={!playingTrack.audio}
                     />
                     <PlaybackControlButton 

@@ -4,7 +4,7 @@ import HappyEmoji from "/img/emoji_happy.webp"
 import RelaxEmoji from "/img/emoji_relax.webp"
 import SadEmoji from "/img/emoji_sad.webp"
 import useIntersectionObserver from "../../hooks/useIntersectionObserver";
-import { requestTracksByMood } from "../../utils/api";
+import { fetchTracksByMood } from "../../utils/api";
 import { useSelector } from "react-redux";
 
 
@@ -70,11 +70,11 @@ export default function MoodSetter(){
     async function searchSongs(mood){
         setIsSearching(true);
 
-        const tracks = await requestTracksByMood(mood);
+        fetchTracksByMood(mood).then(tracks => {
+            setIsSearching(false);
+            navigate(`/player/?mood=${mood}`, {state: {mood: mood, tracks: tracks, playMultiple: true}})
+        });
 
-        setIsSearching(false);
-
-        navigate(`/player/?mood=${mood}`, {state: {mood: mood, tracks: tracks}})
     }
 
     return(

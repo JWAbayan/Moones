@@ -3,14 +3,14 @@ import SampleTrack from "/audio/Natsuhisyou.flac"
 import { Howl, Howler } from "howler";
 import SampleImage from "/img/sample_image.png"
 import { ChevronRightIcon, PauseIcon, PlayIcon, ChevronLeftIcon } from "../../../public/svg/Icons";
-import { requestTracksByMood } from "../../utils/api";
+import { fetchTrackByID, fetchTracksByMood } from "../../utils/api";
 import { useLocation, useParams, useSearchParams } from "react-router";
 import { Moods } from "../../utils/moods";
 
-function PlaybackControlButton({onClick, icon, disabled}){
+function PlaybackControlButton({onClick, icon, disabled, bgColor}){
     return(
         <button 
-            className="flex justify-center items-center rounded-full size-16 bg-yellow shadow mt-10" 
+            className={`flex justify-center items-center rounded-full size-16 shadow mt-10 ${bgColor}`}
             onClick={onClick}
             disabled={disabled}
         >
@@ -18,6 +18,14 @@ function PlaybackControlButton({onClick, icon, disabled}){
             icon
          }   
         </button>
+    )
+}
+
+function TrackImageSkeleton (){
+    return(
+        <div className="absolute size-85 mt-20 rounded-2xl animate-pulse bg-amber-100 border-0">
+           
+        </div>
     )
 }
 
@@ -36,6 +44,8 @@ export default function Player(){
         playingIndex: 0,
     })
 
+    
+
     /***
      * 
      * @audio : Howl object : Howl instance of the playing track
@@ -52,6 +62,8 @@ export default function Player(){
         artist: "Artist 1",
         duration: 60,
     })
+
+    const [imageLoaded, setImageLoaded] = useState(false)
     
     /***
      * 
@@ -65,6 +77,7 @@ export default function Player(){
            volume: 1,
            pos: 0,
            autoplay: true,
+           shuffle: false,
     })
 
     /**
@@ -73,7 +86,7 @@ export default function Player(){
      * 
     */
    const locationState = useLocation();
-   const searchParams = useSearchParams();
+   const [searchParams, setSearchParams] = useSearchParams();
    
     const playbackPosUI = useRef(null);
 
@@ -83,27 +96,25 @@ export default function Player(){
 
     useEffect(()=>{
         if(locationState.state){
-            console.log("HAS LOCATION STATE");
+            console.log(`HAS LOCATION STATE: ${locationState.state}`);
             setupPlayer(locationState.state)
+        }else{
+            fetchMoones(searchParams[0].get("mood"))
         }
-        
-        else{
-            console.log("RELYING ON QUERY PARAMS");
-            fetchTracks(searchParams[0].get("mood"))
-        }
-
+    
         return ()=>{
             clearInterval(updatePlaybackPosInterval.current);
         }
     },[])
     
-    //Effect when the playingTrack changes
     useEffect(()=> {
         if(!playingTrack.audio) return
 
         playingTrack.audio.once("end", () => {
-            if(playbackStates.autoplay)
-                changeTrack(1);
+            if(playbackStates.autoplay){
+                changeTrack();
+                // playerStates.shuffle ? changeTrack() : changeTrack(1)
+            }
             else
                 setPlaybackStates({...playbackStates, paused: true})
         })
@@ -118,7 +129,18 @@ export default function Player(){
         })
     },[playingTrack])
 
-    //Effect when playbackStates.paused changed
+    /**
+     * 
+     * Effect
+     * 
+     * Dependencies:
+     * 
+     * @playbackStates.paused
+     * 
+     * Calls Playing Track's Pause() or Play() depending on the value of playerStates.paused 
+     * Also sets a new playback pos interval when played
+     * 
+     */
     useEffect(()=>{
         if(!playingTrack.audio) return;
         
@@ -130,22 +152,61 @@ export default function Player(){
         }
     },[playbackStates.paused])
 
-    async function fetchTracks(mood){
-        await requestTracksByMood(mood).then(fetchedTracks => {
+    async function fetchMoones(mood){
+        await fetchTracksByMood(mood).then(fetchedTracks => {
             setupPlayer({tracks: fetchedTracks, mood: mood})
         })
     }
     
+    /****
+     * 
+     * setupPlayer() 
+     * 
+     * @state : Object<playerState> -  
+     * 
+     * Sets the new player state and loads the track inside it by calling
+     * 
+     */
     function setupPlayer(state){
-        const newPlayerState = {...playerStates, mood:state.mood, tracks:state.tracks}
 
-        setPlayerStates(newPlayerState)
+        if(state.playMultiple){
+            const newPlayerState = {...playerStates, mood:state.mood, tracks:state.tracks}
+            setPlayerStates(newPlayerState)
+            loadTrack(state.tracks, 0)
+            return;
+        }
 
-        loadTrack(state.tracks, 0)
+        
+        fetchTrackByID(state.trackID).then(fetchedTrack => {
+            if(!fetchedTrack){
+                return;
+            }
+
+            setPlayerStates({
+                ...playerStates,
+                mood: state.mood,
+                tracks: fetchedTrack,
+                playingIndex: 0
+            });
+
+            loadTrack(fetchedTrack, 0);
+            return;
+        })
     }
 
+
+    /***
+     * 
+     * loadTrack() - tracks : Array<object> 
+     * 
+     * @tracks : Array<Object> - list of necessary information of all fetched tracks
+     * @index : number - identifier used to load tracks from tracks
+     * 
+     * Creates a new Howl instance for the selected track and sets it as the new playingTrack when loaded 
+     * 
+     */
     function loadTrack(tracks, index){
-        const track = tracks[index];
+        const track = tracks[index].track;
 
         if(!track){
             return;
@@ -156,6 +217,8 @@ export default function Player(){
         const trackArtist = track.artist_name;
         const trackImgURL = track.album_image;
 
+        setImageLoaded(false);
+
         const howlInstance = new Howl({
             src: [trackURL],
             volume: playerStates.volume,
@@ -165,14 +228,14 @@ export default function Player(){
             onload: () => {
                 if(playingTrack.audio) 
                     playingTrack.audio.unload();
-                
                 setPlayingTrack({
                     audio: howlInstance,
                     img: trackImgURL,
                     title: trackTitle,
                     artist: trackArtist,
                     duration: howlInstance.duration(),
-                })
+                });
+
             },
             onloaderror: (id ,error) => {
                 console.error("Error Loading Track!: " + error)
@@ -182,7 +245,7 @@ export default function Player(){
     }
 
     function adjustVolume(value){
-        currentTrack.track.volume(value);
+        
     }
 
     function updatePlaybackPosOnInterval(audio){
@@ -196,7 +259,14 @@ export default function Player(){
             setPlaybackStates(playbackStates => ({...playbackStates, pos: audio.seek()}))
         }, updateDelay)
     }
-
+    /***
+     * 
+     * handlePlaybackChange()
+     * 
+     * @event : Interface 
+     * 
+     * 
+     */
     function handlePlaybackChange(event){
         if(!playingTrack.audio) return;
 
@@ -216,42 +286,71 @@ export default function Player(){
         setPlaybackStates({...playbackStates, paused: !pause})
     }
 
-    function changeTrack(step, tracks){
+    function getRandomTrackIndex(currentIndex, tracksLength){
+        let index = Math.floor(Math.random() * (tracksLength - 1)) 
+
+        if(index === currentIndex){
+            index += 1;
+
+            if(index >= tracksLength){
+                index = 0
+            }
+        }
+
+        return index
+    }
+
+    function changeTrack(step){
         if(playerStates.tracks.length == 0) {
-            console.log("Tracks Array Empty") 
             return;
         }
 
-        const nextTrackIndex = playerStates.playingIndex + step;
-        const trackIndexInBounds = nextTrackIndex >= 0 && nextTrackIndex < playerStates.tracks.length; 
+        let nextTrackIndex = 0;
+
+        if(step){
+            nextTrackIndex = playerStates.playingIndex + step;
+        }else{
+            nextTrackIndex = getRandomTrackIndex(playerStates.playingIndex, playerStates.tracks.length)
+        }
+
+        const trackIndexInBounds = nextTrackIndex >= 0 
+            && nextTrackIndex < playerStates.tracks.length; 
 
         if(trackIndexInBounds){
             loadTrack(playerStates.tracks, nextTrackIndex);
             setPlayerStates(playerStates=>({
                 ...playerStates,
-                playingIndex: nextTrackIndex,
+                playingIndex: nextTrackIndex
             }))
         }
-        else
-            console.log("Next Track Index is out of bounds")
     }
 
     
     return(
         <div className="w-full flex flex-col items-center font-display">
-            <img className="size-85 mt-20 rounded-2xl object-cover " src={playingTrack.img} alt="cover" />
+            {
+              !imageLoaded && <TrackImageSkeleton/>
+            }
+            <img 
+                className="size-85 mt-20 rounded-2xl object-cover border-0" 
+                src={playingTrack.img} 
+                onLoad={()=> {
+                    setImageLoaded(true);
+                }}
+            />
             <div className="flex flex-col items-center mt-10">
                 <h1 className=" font-bold ">{playingTrack.title}</h1>
                 <h2 className=" text-sm text-gray-500 mt-1">{playingTrack.artist}</h2>
             </div>
             <div className="flex flex-col items-center mt-20 w-full">
-                <input className=" shadow accent-yellow w-[80%] " 
+                <input className="shadow accent-yellow w-[80%]" 
                     ref={playbackPosUI} 
                     type="range" 
                     value={playbackStates.pos} 
                     min={0} 
                     max={playingTrack.duration} 
-                    onChange={handlePlaybackChange} disabled={!playingTrack}
+                    onChange={handlePlaybackChange} 
+                    disabled={!playingTrack}
                 />
                 <div className="flex w-full justify-evenly">
                     <PlaybackControlButton 
@@ -263,6 +362,7 @@ export default function Player(){
                         icon={playbackStates.paused ? <PlayIcon/>: <PauseIcon/>} 
                         onClick={() => handlePause(playbackStates.paused)}
                         disabled={!playingTrack.audio}
+                         bgColor={"bg-yellow"}
                     />
                     <PlaybackControlButton 
                         icon={<ChevronRightIcon/>} 

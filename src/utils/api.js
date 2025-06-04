@@ -6,7 +6,13 @@ const reqInstance = axios.create({
     timeout: 20000,
 })
 
-export async function requestTracksByMood(mood){
+
+const feed = { 
+    featuredPopular:[],
+    featuredSad: [],
+} 
+
+export async function fetchTracksByMood(mood){
     return reqInstance.get("/moones", {
         params:{
             mood: mood
@@ -17,13 +23,43 @@ export async function requestTracksByMood(mood){
             return;
         }
 
-        return res.data;
+        return res.data.tracks;
     }).catch(error => {
+        return
         console.log(error);
     })
 }
 
-export async function getHighlightTracks(){
+export async function fetchFeatured(){
+    return reqInstance.get("/featured").then( res =>{
+        if(res.data.status !== 200){
+            console.log("Failed Request")
+            return;
+        }
+        console.log(res.data.tracks);
+        return res.data.tracks;
+    }).catch(error => {
+        console.log(error);
+    })
+} 
 
+export async function fetchTrackByID(trackID){
+    return reqInstance.get("/tracks", {
+        params: {
+            trackID: trackID,
+        }
+    })
+    .then( res =>{
+        if(res.data.status !== 200){
+            console.log("Failed Request")
+            return;
+        }
+
+        console.log(res.data);
+
+        return res.data.results;
+    })
+    .catch(error => {
+        console.log(error);
+    })
 }
-

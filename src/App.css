@@ -28,7 +28,10 @@
   --font-display: "Metropolis";
   --color-yellow: #ffc20c;
   --white-fade: linear-gradient(90deg,rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 1) 46%, rgba(255, 255, 255, 1) 50%, rgba(255, 255, 255, 1) 100%);
+  --color-error: #eb4961;
+  --color-affirm: #49eb77;
 }
+
 
 @layer{
   .scrollbar-hide::-webkit-scrollbar {

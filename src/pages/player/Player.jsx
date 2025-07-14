@@ -24,7 +24,6 @@ function PlaybackControlButton({onClick, icon, disabled, bgColor}){
 function TrackImageSkeleton (){
     return(
         <div className="absolute size-85 mt-20 rounded-2xl animate-pulse bg-amber-100 border-0">
-           
         </div>
     )
 }
@@ -302,6 +301,7 @@ export default function Player(){
 
     function changeTrack(step){
         if(playerStates.tracks.length == 0) {
+            //Todo: should play a random track based on the mood of the previous track
             return;
         }
 

@@ -56,7 +56,6 @@ function ScrollableList({horizontal, items}){
 }
 
 function FormInput({type, name, placeholder, onChange, valid, value}){
-
     return(
         <div className={`flex border-1 ${valid || !value ? "border-gray-200" : "border-red-400"} mt-5 rounded-sm p-2 relative w-full`}>
             <input 
@@ -78,7 +77,6 @@ function FormInput({type, name, placeholder, onChange, valid, value}){
 }
 
 function FormTextArea({ name, placeholder, onChange, valid, value}){
-
     return(
         <div className={`flex flex-col border-1 ${valid || !value ? "border-gray-200" : "border-red-400"} mt-5 rounded-sm p-2 relative w-full`}>
             <textarea   
@@ -150,6 +148,11 @@ export default function Home({}){
     }
 
     function submitContactForm(event){
+
+        if(!infoValidity.validEmail && !infoValidity.validMessage && !infoValidity.validName){
+            //Show Popup
+        }
+
         event.preventDefault();
     }
     
@@ -190,7 +193,7 @@ export default function Home({}){
                 <h2 className="font-display mt-3 text-gray-500">
                     Have any questions or suggestions <br/> We are here to listen.
                 </h2>
-                <form className="flex flex-col min-w-full space-y-1 relative" onSubmit={submitContactForm}>
+                <form className="flex flex-col min-w-full space-y-1" onSubmit={submitContactForm}>
                     <FormInput 
                         type={"text"} 
                         name={"Name"} 
